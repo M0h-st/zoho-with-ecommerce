@@ -1,106 +1,113 @@
 # WooCommerce → Zoho CRM Integration
 
-Production-ready WordPress plugin that syncs WooCommerce orders to **Zoho CRM Free** as Contacts and Deals (or Leads).
+## Integration tools
 
-## Architecture
-
-```
-Customer checkout
-       ↓
-WooCommerce order (processing/completed)
-       ↓
-Plugin hooks → Zoho CRM API v2
-       ├── Contacts/upsert  (customer by email)
-       └── Deals or Leads   (order value + products)
-```
-
-| Component | Location |
-|-----------|----------|
-| WordPress plugin | `app/public/wp-content/plugins/woocommerce-zoho-crm/` |
-| CLI sync script | `integration/sync-latest-order.php` |
+- **Zoho Deluge** — automation logic inside Zoho CRM
+- **WooCommerce REST API** — read new orders
+- **Zoho CRM API** — create/update Contacts and Deals
 
 ---
 
-## Client setup (production)
+## Architecture (recommended)
 
-### 1. Install & activate
+```
+Customer places order (WooCommerce)
+              ↓
+WooCommerce REST API  GET /wp-json/wc/v3/orders
+              ↓
+Deluge function (scheduled in Zoho CRM)
+              ↓
+Zoho CRM API
+   ├── Contact upsert (by email)
+   └── Deal create (order total + products)
+              ↓
+Verify in CRM → Contacts + Deals
+```
 
-1. Deploy the site (Local, staging, or production).
-2. WP Admin → **Plugins** → activate **WooCommerce Zoho CRM Integration**.
+| Step | System | Action |
+|------|--------|--------|
+| 1 | WooCommerce | Customer checkout |
+| 2 | REST API | Deluge fetches order (name, email, products, total) |
+| 3 | CRM API | Upsert Contact, create Deal |
+| 4 | Zoho CRM UI | Confirm Contact and Deal exist |
 
-### 2. Create Zoho API application
+Implementation: [`deluge/sync-woocommerce-orders.deluge`](deluge/sync-woocommerce-orders.deluge)
 
-1. Log in to [Zoho API Console](https://api-console.zoho.com/) with the **client's Zoho account**.
-2. **Add Client** → **Server-based Applications**.
-3. Copy the **Redirect URI** shown in WordPress:
-   - **WooCommerce → Zoho CRM** → connection box
-   - Example: `https://yourstore.com/wp-admin/admin-post.php?action=wczc_oauth_callback`
-4. Paste that URI into Zoho API Console → **Authorized Redirect URIs** → Save.
-5. Copy **Client ID** and **Client Secret** from Zoho.
+Setup guide: [`deluge/README.md`](deluge/README.md)
 
-> **Local dev:** use your Local site URL (e.g. `http://ecommerce-with-zoho.local/wp-admin/admin-post.php?action=wczc_oauth_callback`). It must match exactly in Zoho.
+---
 
-### 3. Connect in WordPress (OAuth — no manual tokens)
+## Part A — WooCommerce REST API
 
-1. **WooCommerce → Zoho CRM**
-2. Paste **Client ID** and **Client Secret**
-3. Select correct **Data center** (US / EU / India / Australia)
-4. Click **Save settings**
-5. Click **Connect to Zoho CRM**
-6. Log in to Zoho → approve access
-7. Redirect back → status shows **Connected**
+### Create API keys
 
-The plugin stores the refresh token securely in the WordPress database. No curl commands or Self Client needed.
+1. WP Admin → **WooCommerce → Settings → Advanced → REST API**
+2. **Add key**
+   - Description: `Zoho CRM Sync`
+   - User: admin
+   - Permissions: **Read**
+3. Copy **Consumer key** and **Consumer secret**
 
-### 4. Configure sync
-
-| Setting | Recommended |
-|---------|-------------|
-| Enable integration | ✓ |
-| CRM record type | Deal |
-| Sync when order is | Processing |
-| Deal stage | Match client's Zoho pipeline (e.g. `Qualification`) |
-
-Click **Test API connection** to verify.
-
-### 5. Test end-to-end
-
-1. Place a test order on the store.
-2. Confirm order reaches **Processing** status.
-3. Check WP Admin order screen → **Zoho CRM** box shows Contact ID + Deal ID.
-4. Log in to [Zoho CRM](https://crm.zoho.com) → verify Contact and Deal.
-
-Or run manually:
+### Test endpoint
 
 ```bash
-php integration/sync-latest-order.php
+curl "https://YOUR-STORE.com/wp-json/wc/v3/orders?status=processing&per_page=1" \
+  -u "ck_XXXX:cs_XXXX"
 ```
 
 ---
 
-## What gets synced
+## Part B — Zoho Deluge + Connection
+
+### WooCommerce connection in Zoho
+
+1. Zoho CRM → **Setup → Developer Space → Connections**
+2. **Add Connection** → Custom Service
+3. Connection name: `woocommerce_rest_api`
+4. Auth: **Basic Auth** — key as username, secret as password
+5. Base URL: your store root URL
+
+### Deluge function
+
+1. **Setup → Developer Space → Functions → + Function**
+2. Paste [`deluge/sync-woocommerce-orders.deluge`](deluge/sync-woocommerce-orders.deluge)
+3. Update configuration variables at top of script
+4. Save and **Execute** to test
+
+### Schedule
+
+- **Setup → Automation** → Workflow or Schedule
+- Run `Sync WooCommerce Orders` every 15 minutes (or after each test order manually)
+
+---
+
+## Part C — Verify in Zoho CRM
+
+1. Log in to [Zoho CRM](https://crm.zoho.com) (or your regional URL)
+2. **Contacts** — find customer by billing email
+3. **Deals** — find `WooCommerce Order #123`
+4. Confirm **Amount** and product **Description** match the order
+
+---
+
+## Data mapped
 
 | WooCommerce | Zoho Contact | Zoho Deal |
 |-------------|--------------|-----------|
-| Billing name | First_Name, Last_Name | Deal title |
-| Email | Email (upsert key) | — |
-| Phone | Phone | — |
-| Address | Mailing_* | — |
+| Billing name | First_Name, Last_Name | Deal_Name (in title) |
+| Billing email | Email | — |
+| Billing phone | Phone | — |
+| Billing address | Mailing_* | — |
 | Line items | — | Description |
 | Order total | — | Amount |
 
-Each order syncs once. Order meta tracks Zoho IDs and prevents duplicates.
-
 ---
 
-## Admin features
+## Optional — WordPress plugin
 
-- **Connect / Disconnect / Re-authorize** — standard OAuth 2.0 flow
-- **Connection status** — connected timestamp
-- **Redirect URI** — copy-paste for Zoho API Console
-- **Per-order sync** — manual "Sync to Zoho CRM" button on order screen
-- **Diagnostics** — test connection, sync latest order
-- **Logging** — WooCommerce → Status → Logs → `woocommerce-zoho-crm`
+The repo also includes a WordPress plugin (`woocommerce-zoho-crm/`) that syncs on order status via PHP + OAuth. Use this if you prefer server-side hooks instead of Deluge polling.
+
+**WooCommerce → Zoho CRM** in WP Admin for plugin OAuth setup.
 
 ---
 
@@ -108,19 +115,17 @@ Each order syncs once. Order meta tracks Zoho IDs and prevents duplicates.
 
 | Issue | Fix |
 |-------|-----|
-| `Invalid Redirect URI` | Redirect URI in Zoho must match WordPress exactly |
-| `Invalid OAuth state` | Click Connect again (session expired) |
-| Token refresh failed | Re-authorize via **Connect to Zoho CRM** |
-| Invalid deal stage | Use exact stage name from Zoho CRM setup |
-| Order not syncing | Enable integration + confirm order status matches setting |
+| Deluge can't reach local store | Use ngrok/public URL; Zoho Cloud can't hit `*.local` |
+| Empty orders list | Check API key permissions and order status filter |
+| Deal stage error | Set `deal_stage` to a valid pipeline stage name |
+| Duplicate deals | Script skips orders when Deal name already exists |
 
 ---
 
 ## Deployment checklist
 
-- [ ] Plugin activated on production
-- [ ] Zoho Server-based app created with production redirect URI
-- [ ] OAuth connected (green Connected status)
-- [ ] Integration enabled
-- [ ] Test order synced and verified in Zoho CRM
-- [ ] Deal stage matches client pipeline
+- [ ] WooCommerce REST API key created (Read)
+- [ ] Zoho Connection configured and linked in Deluge
+- [ ] Deluge function saved and tested
+- [ ] Schedule or manual run verified
+- [ ] Test order appears in Contacts + Deals

@@ -7,7 +7,11 @@
 !LICENSE
 !ZOHO-INTEGRATION.md
 
-# # Integration plugin (the deliverable)
+# # Deluge integration (primary deliverable)
+# !deluge/
+# !deluge/**
+
+# # Integration plugin (optional WordPress path)
 # !app/
 # !app/public/
 # !app/public/wp-content/
