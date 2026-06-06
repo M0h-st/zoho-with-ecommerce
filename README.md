@@ -4,6 +4,8 @@ WordPress plugin that syncs WooCommerce orders to **Zoho CRM Free** as Contacts 
 
 **Author:** Mohanad Abdellah
 
+**Repository:** [github.com/M0h-st/zoho-with-ecommerce](https://github.com/M0h-st/zoho-with-ecommerce)
+
 ## Repository contents
 
 | Path | Description |
