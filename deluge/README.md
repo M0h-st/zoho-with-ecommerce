@@ -17,7 +17,7 @@ Schedule (Zoho CRM)
        ↓
 Deluge function
        ↓
-GET /wp-json/wc/v3/orders  ← WooCommerce REST API
+GET /wp-json/wc/v3/orders  ← WooCommerce REST API (OAuth 1.0a)
        ↓
 For each order:
   ├── Search/update Contact by email
@@ -30,26 +30,28 @@ For each order:
 2. **Add key** — Read permission
 3. Copy **Consumer key** and **Consumer secret**
 
-## 2. Zoho Connection (WooCommerce)
+## 2. Configure OAuth credentials in the script
 
-1. Zoho CRM → **Setup → Developer Space → Connections**
-2. **Add Connection** → **Custom Service**
-3. Name: `woocommerce_rest_api` (must match script)
-4. Authentication: **Basic Auth**
-   - Username = Consumer key
-   - Password = Consumer secret
-5. Base URL = your store URL (e.g. `https://yourstore.com`)
+WooCommerce uses **OAuth 1.0a one-legged** signing (not Basic Auth, not OAuth 2.0). The Deluge script signs each request with your consumer key/secret.
+
+Edit the top of [`sync-woocommerce-orders.deluge`](sync-woocommerce-orders.deluge):
+
+```deluge
+store_url = "https://your-store.com";
+consumer_key = "ck_xxxxxxxx";
+consumer_secret = "cs_xxxxxxxx";
+wc_status = "processing";
+deal_stage = "Qualification";
+```
+
+No Zoho Connection is required. Store secrets in Zoho CRM org variables if you prefer not to hardcode them.
 
 ## 3. Install Deluge function
 
 1. Zoho CRM → **Setup → Developer Space → Functions**
 2. **+ Function** → name: `Sync WooCommerce Orders`
 3. Paste code from [`sync-woocommerce-orders.deluge`](sync-woocommerce-orders.deluge)
-4. Edit top of script:
-   - `store_url`
-   - `wc_status` (`processing` or `completed`)
-   - `deal_stage` (must exist in your CRM pipeline)
-   - `connection_name`
+4. Edit configuration variables at the top of the script
 
 ## 4. Schedule it
 
@@ -71,6 +73,7 @@ For each order:
 ## Notes
 
 - Deluge uses built-in `zoho.crm.*` — no separate CRM OAuth in the script
+- WooCommerce OAuth signs each REST call with HMAC-SHA1
 - Duplicate orders skipped by Deal name
 - Contacts updated when email already exists
 - For local stores, use your Local URL and ensure Zoho can reach it (tunnel/ngrok for cloud Zoho)

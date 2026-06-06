@@ -57,21 +57,20 @@ curl "https://YOUR-STORE.com/wp-json/wc/v3/orders?status=processing&per_page=1" 
 
 ---
 
-## Part B — Zoho Deluge + Connection
+## Part B — Zoho Deluge (OAuth 1.0a)
 
-### WooCommerce connection in Zoho
-
-1. Zoho CRM → **Setup → Developer Space → Connections**
-2. **Add Connection** → Custom Service
-3. Connection name: `woocommerce_rest_api`
-4. Auth: **Basic Auth** — key as username, secret as password
-5. Base URL: your store root URL
+WooCommerce REST API uses **OAuth 1.0a one-legged** signing. The Deluge script signs each request with your consumer key/secret — no Zoho Connection needed.
 
 ### Deluge function
 
 1. **Setup → Developer Space → Functions → + Function**
 2. Paste [`deluge/sync-woocommerce-orders.deluge`](deluge/sync-woocommerce-orders.deluge)
-3. Update configuration variables at top of script
+3. Set at top of script:
+   - `store_url`
+   - `consumer_key`
+   - `consumer_secret`
+   - `wc_status`
+   - `deal_stage`
 4. Save and **Execute** to test
 
 ### Schedule

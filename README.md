@@ -38,8 +38,8 @@ WooCommerce store                    Zoho CRM
 ## Quick start (Deluge)
 
 1. Create WooCommerce REST API keys (**WooCommerce → Settings → Advanced → REST API**)
-2. Add a Zoho **Connection** to your store (Basic Auth with API keys)
-3. Copy [`deluge/sync-woocommerce-orders.deluge`](deluge/sync-woocommerce-orders.deluge) into a Zoho CRM Function
+2. Copy [`deluge/sync-woocommerce-orders.deluge`](deluge/sync-woocommerce-orders.deluge) into a Zoho CRM Function
+3. Set `store_url`, `consumer_key`, and `consumer_secret` at the top of the script (OAuth 1.0a signing)
 4. Schedule the function (e.g. every 15 minutes)
 5. Place a test order → verify **Contacts** and **Deals** in Zoho CRM
 

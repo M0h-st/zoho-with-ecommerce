@@ -3,22 +3,99 @@
 //
 // Integration tools:
 //   1. Deluge (this script)
-//   2. WooCommerce REST API — read orders
+//   2. WooCommerce REST API — read orders (OAuth 1.0a one-legged)
 //   3. Zoho CRM API — create/update Contacts and Deals
 
 // --- Configuration (edit before running) ---
 store_url = "https://your-store.com";
+consumer_key = "ck_your_consumer_key";
+consumer_secret = "cs_your_consumer_secret";
 wc_status = "processing"; // processing | completed
 deal_stage = "Qualification";
-connection_name = "woocommerce_rest_api"; // Zoho Connection (Basic Auth: ck + cs)
-orders_path = "/wp-json/wc/v3/orders?status=" + wc_status + "&orderby=date&order=desc&per_page=10";
+
+// --- WooCommerce OAuth 1.0a (one-legged) ---
+if(store_url.endsWith("/"))
+{
+	store_url = store_url.subString(0, store_url.length() - 1);
+}
+
+api_path = "/wp-json/wc/v3/orders";
+base_request_uri = store_url + api_path;
+oauth_method = "GET";
+oauth_timestamp = floor(zoho.currenttime.toLong() / 1000).toString();
+oauth_nonce_raw = zoho.encryption.hmacsha1(consumer_key, oauth_timestamp + zoho.currenttime.toString());
+oauth_nonce = oauth_nonce_raw.replaceAll("=", "", true).replaceAll("/", "", true).replaceAll("+", "", true);
+if(oauth_nonce.length() > 32)
+{
+	oauth_nonce = oauth_nonce.subString(0, 32);
+}
+
+sign_params = Map();
+sign_params.put("status", wc_status);
+sign_params.put("orderby", "date");
+sign_params.put("order", "desc");
+sign_params.put("per_page", "10");
+sign_params.put("oauth_consumer_key", consumer_key);
+sign_params.put("oauth_nonce", oauth_nonce);
+sign_params.put("oauth_signature_method", "HMAC-SHA1");
+sign_params.put("oauth_timestamp", oauth_timestamp);
+
+param_keys = sign_params.keys();
+param_keys.sort(true);
+
+encoded_pairs = List();
+for each param_key in param_keys
+{
+	param_value = sign_params.get(param_key);
+	encoded_key = zoho.encryption.urlEncode(param_key);
+	encoded_value = zoho.encryption.urlEncode(param_value);
+	encoded_value = encoded_value.replaceAll("%", "%25", true);
+	encoded_pairs.add(encoded_key + "%3D" + encoded_value);
+}
+
+encoded_param_string = "";
+for each encoded_pair in encoded_pairs
+{
+	if(encoded_param_string != "")
+	{
+		encoded_param_string = encoded_param_string + "%26";
+	}
+	encoded_param_string = encoded_param_string + encoded_pair;
+}
+
+signature_base = oauth_method + "&" + zoho.encryption.urlEncode(base_request_uri) + "&" + encoded_param_string;
+oauth_signature = zoho.encryption.hmacsha1(consumer_secret + "&", signature_base);
+
+request_params = Map();
+request_params.put("status", wc_status);
+request_params.put("orderby", "date");
+request_params.put("order", "desc");
+request_params.put("per_page", "10");
+request_params.put("oauth_consumer_key", consumer_key);
+request_params.put("oauth_nonce", oauth_nonce);
+request_params.put("oauth_signature_method", "HMAC-SHA1");
+request_params.put("oauth_timestamp", oauth_timestamp);
+request_params.put("oauth_signature", oauth_signature);
+
+query_keys = request_params.keys();
+query_keys.sort(true);
+query_string = "";
+for each query_key in query_keys
+{
+	if(query_string != "")
+	{
+		query_string = query_string + "&";
+	}
+	query_string = query_string + zoho.encryption.urlEncode(query_key) + "=" + zoho.encryption.urlEncode(request_params.get(query_key));
+}
+
+orders_url = base_request_uri + "?" + query_string;
 
 // --- Fetch orders from WooCommerce REST API ---
 orders_response = invokeurl
 [
-	url: store_url + orders_path
+	url: orders_url
 	type: GET
-	connection: connection_name
 ];
 
 if(orders_response == null)
