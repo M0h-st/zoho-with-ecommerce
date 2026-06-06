@@ -7,17 +7,17 @@
 !LICENSE
 !ZOHO-INTEGRATION.md
 
-# # Deluge integration (primary deliverable)
-# !deluge/
-# !deluge/**
+# Deluge integration (primary deliverable)
+!deluge/
+!deluge/**
 
-# # Integration plugin (optional WordPress path)
-# !app/
-# !app/public/
-# !app/public/wp-content/
-# !app/public/wp-content/plugins/
-# !app/public/wp-content/plugins/woocommerce-zoho-crm/
-# !app/public/wp-content/plugins/woocommerce-zoho-crm/**
+# Integration plugin (optional WordPress path)
+!app/
+!app/public/
+!app/public/wp-content/
+!app/public/wp-content/plugins/
+!app/public/wp-content/plugins/woocommerce-zoho-crm/
+!app/public/wp-content/plugins/woocommerce-zoho-crm/**
 
 # CLI helper
 !integration/

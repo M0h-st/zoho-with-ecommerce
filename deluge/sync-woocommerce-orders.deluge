@@ -1,0 +1,134 @@
+// WooCommerce → Zoho CRM sync (Deluge)
+// Run as: Zoho CRM → Setup → Automation → Functions → Schedule / Workflow
+//
+// Integration tools:
+//   1. Deluge (this script)
+//   2. WooCommerce REST API — read orders
+//   3. Zoho CRM API — create/update Contacts and Deals
+
+// --- Configuration (edit before running) ---
+store_url = "https://your-store.com";
+wc_status = "processing"; // processing | completed
+deal_stage = "Qualification";
+connection_name = "woocommerce_rest_api"; // Zoho Connection (Basic Auth: ck + cs)
+orders_path = "/wp-json/wc/v3/orders?status=" + wc_status + "&orderby=date&order=desc&per_page=10";
+
+// --- Fetch orders from WooCommerce REST API ---
+orders_response = invokeurl
+[
+	url: store_url + orders_path
+	type: GET
+	connection: connection_name
+];
+
+if(orders_response == null)
+{
+	info "WooCommerce API returned no data.";
+	return;
+}
+
+// WooCommerce returns a JSON list of orders.
+for each order in orders_response
+{
+	order_id = order.get("id");
+	if(order_id == null)
+	{
+		continue;
+	}
+
+	deal_name = "WooCommerce Order #" + order_id;
+	existing_deals = zoho.crm.searchRecords("Deals","(Deal_Name:equals:" + deal_name + ")");
+
+	if(existing_deals.size() > 0)
+	{
+		info "Order already synced: " + order_id;
+		continue;
+	}
+
+	billing = order.get("billing");
+	if(billing == null)
+	{
+		continue;
+	}
+
+	email = ifnull(billing.get("email"),"");
+	if(email == "")
+	{
+		info "Skipping order " + order_id + " — no billing email.";
+		continue;
+	}
+
+	first_name = ifnull(billing.get("first_name"),"");
+	last_name = ifnull(billing.get("last_name"),"Customer");
+	phone = ifnull(billing.get("phone"),"");
+	full_name = trim(first_name + " " + last_name);
+
+	// --- Contact: search by email, then create or update ---
+	contact_id = "";
+	existing_contacts = zoho.crm.searchRecords("Contacts","(Email:equals:" + email + ")");
+
+	contact_data = Map();
+	contact_data.put("First_Name",first_name);
+	contact_data.put("Last_Name",last_name);
+	contact_data.put("Email",email);
+	contact_data.put("Phone",phone);
+	contact_data.put("Mailing_Street",ifnull(billing.get("address_1"),"") + " " + ifnull(billing.get("address_2"),""));
+	contact_data.put("Mailing_City",ifnull(billing.get("city"),""));
+	contact_data.put("Mailing_State",ifnull(billing.get("state"),""));
+	contact_data.put("Mailing_Zip",ifnull(billing.get("postcode"),""));
+	contact_data.put("Mailing_Country",ifnull(billing.get("country"),""));
+
+	if(existing_contacts.size() > 0)
+	{
+		contact_id = existing_contacts.get(0).get("id");
+		update_response = zoho.crm.updateRecord("Contacts",contact_id,contact_data);
+		info "Updated contact " + contact_id + " for order " + order_id;
+	}
+	else
+	{
+		create_contact = zoho.crm.createRecord("Contacts",contact_data);
+		contact_id = create_contact.get("id");
+		info "Created contact " + contact_id + " for order " + order_id;
+	}
+
+	// --- Deal: order total + product list ---
+	line_items = order.get("line_items");
+	products = List();
+
+	if(line_items != null)
+	{
+		for each item in line_items
+		{
+			item_name = ifnull(item.get("name"),"Product");
+			qty = ifnull(item.get("quantity"),1);
+			products.add(item_name + " x " + qty);
+		}
+	}
+
+	description = "";
+	for each product_line in products
+	{
+		if(description != "")
+		{
+			description = description + ", ";
+		}
+		description = description + product_line;
+	}
+	order_total = ifnull(order.get("total"),"0");
+
+	deal_data = Map();
+	deal_data.put("Deal_Name",deal_name);
+	deal_data.put("Amount",order_total);
+	deal_data.put("Stage",deal_stage);
+	deal_data.put("Description",description);
+	deal_data.put("Closing_Date",today.addDay(30));
+
+	contact_lookup = Map();
+	contact_lookup.put("id",contact_id);
+	deal_data.put("Contact_Name",contact_lookup);
+
+	deal_response = zoho.crm.createRecord("Deals",deal_data);
+	info "Created deal " + deal_response.get("id") + " for order " + order_id;
+}
+
+return "WooCommerce sync finished.";
