@@ -9,7 +9,7 @@
 string standalone.sync_wc_orders()
 {
 	// --- Configuration (edit before running) ---
-	store_url = "https://your-subdomain.trycloudflare.com";
+	store_url = "https://your-store.com";
 	consumer_key = "ck_your_consumer_key";
 	consumer_secret = "cs_your_consumer_secret";
 	wc_status = "processing";

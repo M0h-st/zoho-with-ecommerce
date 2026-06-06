@@ -17,9 +17,10 @@ Schedule (Zoho CRM)
        ↓
 Deluge function
        ↓
-GET /wp-json/wc/v3/orders  ← WooCommerce REST API (OAuth 1.0a)
+GET /wp-json/wc/v3/orders  ← WooCommerce REST API (OAuth 1.0a signed)
        ↓
 For each order:
+  ├── Search/update Lead by email
   ├── Search/update Contact by email
   └── Create Deal (skip if already synced)
 ```
@@ -30,11 +31,11 @@ For each order:
 2. **Add key** — Read permission
 3. Copy **Consumer key** and **Consumer secret**
 
-## 2. Configure OAuth credentials in the script
+## 2. Configure API credentials in the script
 
-WooCommerce uses **OAuth 1.0a one-legged** signing (not Basic Auth, not OAuth 2.0). The Deluge script signs each request with your consumer key/secret.
+WooCommerce REST API uses **OAuth 1.0a one-legged** signing (not OAuth 2.0 — WC has no OAuth2 token endpoint for API keys).
 
-Edit the top of [`sync-woocommerce-orders.deluge`](sync-woocommerce-orders.deluge):
+Edit inside the function body:
 
 ```deluge
 store_url = "https://your-store.com";
@@ -44,14 +45,17 @@ wc_status = "processing";
 deal_stage = "Qualification";
 ```
 
-No Zoho Connection is required. Store secrets in Zoho CRM org variables if you prefer not to hardcode them.
+Timestamp is generated in **GMT unix seconds** via `unixEpoch("GMT")`.
 
 ## 3. Install Deluge function
 
 1. Zoho CRM → **Setup → Developer Space → Functions**
-2. **+ Function** → name: `Sync WooCommerce Orders`
-3. Paste code from [`sync-woocommerce-orders.deluge`](sync-woocommerce-orders.deluge)
-4. Edit configuration variables at the top of the script
+2. **+ Function** → Category: **Standalone**
+3. Function name: `sync_wc_orders` (no spaces — not `Sync WooCommerce Orders`)
+4. Return type: **string**
+5. Paste code from [`sync-woocommerce-orders.deluge`](sync-woocommerce-orders.deluge)
+6. Wrapper must be: `string standalone.sync_wc_orders() { ... }`
+7. Edit config variables inside the function body
 
 ## 4. Schedule it
 
@@ -67,13 +71,13 @@ No Zoho Connection is required. Store secrets in Zoho CRM org variables if you p
 
 ## Verify in Zoho CRM
 
+- **Leads** — customer email, Lead Source = WooCommerce
 - **Contacts** — customer email from order billing
-- **Deals** — title `WooCommerce Order #123`, amount = order total
+- **Deals** — title `WC_Order_123`, amount = order total
 
 ## Notes
 
 - Deluge uses built-in `zoho.crm.*` — no separate CRM OAuth in the script
-- WooCommerce OAuth signs each REST call with HMAC-SHA1
+- OAuth 1.0a HMAC-SHA1 signing (GMT timestamp via unixEpoch)
 - Duplicate orders skipped by Deal name
-- Contacts updated when email already exists
-- For local stores, use your Local URL and ensure Zoho can reach it (tunnel/ngrok for cloud Zoho)
+- Leads and Contacts updated when email already exists

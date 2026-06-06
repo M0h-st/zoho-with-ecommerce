@@ -91,12 +91,13 @@ WooCommerce REST API uses **OAuth 1.0a one-legged** signing. The Deluge script s
 
 ## Data mapped
 
-| WooCommerce | Zoho Contact | Zoho Deal |
-|-------------|--------------|-----------|
-| Billing name | First_Name, Last_Name | Deal_Name (in title) |
+| WooCommerce | Zoho Lead / Contact | Zoho Deal |
+|-------------|---------------------|-----------|
+| Billing name | First_Name, Last_Name | — |
 | Billing email | Email | — |
 | Billing phone | Phone | — |
-| Billing address | Mailing_* | — |
+| Billing address | Street / Mailing_* | — |
+| Order ref | Description (Lead) | Deal_Name `WC_Order_{id}` |
 | Line items | — | Description |
 | Order total | — | Amount |
 
@@ -114,7 +115,6 @@ The repo also includes a WordPress plugin (`woocommerce-zoho-crm/`) that syncs o
 
 | Issue | Fix |
 |-------|-----|
-| Deluge can't reach local store | Use ngrok/public URL; Zoho Cloud can't hit `*.local` |
 | Empty orders list | Check API key permissions and order status filter |
 | Deal stage error | Set `deal_stage` to a valid pipeline stage name |
 | Duplicate deals | Script skips orders when Deal name already exists |
